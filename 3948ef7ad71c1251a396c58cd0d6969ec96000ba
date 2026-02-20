@@ -1,0 +1,23 @@
+README.md
+  4899c0eb1047ddfb 3,17,19-23,25,30,56,65-71,73,75-78,80,82,84-90,99,124-129,149,154,181,197,206,209-210,212,215,217,219-221,223,225-259,263
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.3",
+  "base_commit_sha": "3948ef7ad71c1251a396c58cd0d6969ec96000ba",
+  "prompts": {
+    "4899c0eb1047ddfb": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "91f51bf4-1cd1-4727-ad19-0a41b279dfcc",
+        "model": "claude-4.6-opus-high-thinking"
+      },
+      "human_author": "bachgarash <bakhtiyar.garashov@zendesk.com>",
+      "messages": [],
+      "total_additions": 100,
+      "total_deletions": 50,
+      "accepted_lines": 92,
+      "overriden_lines": 0
+    }
+  }
+}
