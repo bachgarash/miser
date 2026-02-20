@@ -1,0 +1,61 @@
+# Miser — Anthropic API proxy with cost tracking
+# Config file searched in: ./miser.toml, ~/.config/miser/config.toml
+# CLI flags (--port, --target) override values here.
+
+[proxy]
+port    = 8080
+target  = "https://api.anthropic.com"
+timeout = "5m"                              # upstream request timeout
+
+# ── Model pricing ($ per 1 M tokens) ────────────────────────────────────
+# Add or override any model. Unknown models fall back to [fallback].
+
+[models.claude-sonnet-4-20250514]
+aliases           = ["claude-sonnet-4"]
+input_per_mtok    = 3.00
+output_per_mtok   = 15.00
+cache_read_per_mtok  = 0.30
+cache_write_per_mtok = 3.75
+
+[models.claude-opus-4-20250514]
+aliases           = ["claude-opus-4"]
+input_per_mtok    = 15.00
+output_per_mtok   = 75.00
+cache_read_per_mtok  = 1.50
+cache_write_per_mtok = 18.75
+
+[models.claude-3-7-sonnet-20250219]
+aliases           = ["claude-3-7-sonnet"]
+input_per_mtok    = 3.00
+output_per_mtok   = 15.00
+cache_read_per_mtok  = 0.30
+cache_write_per_mtok = 3.75
+
+[models.claude-3-5-sonnet-20241022]
+aliases           = ["claude-3-5-sonnet"]
+input_per_mtok    = 3.00
+output_per_mtok   = 15.00
+cache_read_per_mtok  = 0.30
+cache_write_per_mtok = 3.75
+
+[models.claude-3-5-haiku-20241022]
+aliases           = ["claude-3-5-haiku"]
+input_per_mtok    = 0.80
+output_per_mtok   = 4.00
+cache_read_per_mtok  = 0.08
+cache_write_per_mtok = 1.00
+
+[models.claude-3-opus-20240229]
+aliases           = ["claude-3-opus"]
+input_per_mtok    = 15.00
+output_per_mtok   = 75.00
+cache_read_per_mtok  = 1.50
+cache_write_per_mtok = 18.75
+
+# ── Fallback pricing for unrecognised models ─────────────────────────────
+
+[fallback]
+input_per_mtok    = 3.00
+output_per_mtok   = 15.00
+cache_read_per_mtok  = 0.30
+cache_write_per_mtok = 3.75
