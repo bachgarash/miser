@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"miser/internal/compress"
 	"miser/internal/config"
 	"miser/internal/proxy"
 	"miser/internal/tracker"
@@ -70,13 +71,20 @@ func runServe(cmd *cobra.Command, _ []string) error {
 
 	t := tracker.New()
 
+	compCfg := compress.Config{
+		Whitespace:      cfg.Compression.Whitespace,
+		StackTruncation: cfg.Compression.StackTruncation,
+		Deduplication:   cfg.Compression.Deduplication,
+		MinBlockSize:    cfg.Compression.MinBlockSize,
+	}
+
 	if headless {
 		t.OnRecord = func(r tracker.Request) {
 			status := fmt.Sprintf("%d", r.StatusCode)
 			if r.Error != "" {
 				status = "ERR"
 			}
-			fmt.Fprintf(os.Stderr, "%s  %-22s  %6s in  %6s out  %8s  %6s  %s\n",
+			line := fmt.Sprintf("%s  %-22s  %6s in  %6s out  %8s  %6s  %s",
 				r.Timestamp.Format("15:04:05"),
 				r.Model,
 				fmtTok(r.InputTokens), fmtTok(r.OutputTokens),
@@ -84,10 +92,15 @@ func runServe(cmd *cobra.Command, _ []string) error {
 				fmtLat(r.Latency),
 				status,
 			)
+			if r.OriginalSize > 0 && r.CompressedSize < r.OriginalSize {
+				pct := 100 - 100*r.CompressedSize/r.OriginalSize
+				line += fmt.Sprintf("  (compressed %d%%)", pct)
+			}
+			fmt.Fprintln(os.Stderr, line)
 		}
 	}
 
-	srv := proxy.NewServer(cfg.Proxy.Port, cfg.Proxy.Target, cfg.ProxyTimeout(), t)
+	srv := proxy.NewServer(cfg.Proxy.Port, cfg.Proxy.Target, cfg.ProxyTimeout(), t, compCfg)
 
 	errCh := make(chan error, 1)
 	go func() { errCh <- srv.Start(ctx) }()

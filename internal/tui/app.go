@@ -170,6 +170,10 @@ func (a *App) renderStats() {
 		formatTokens(s.TotalInput), formatTokens(s.TotalOutput),
 		formatTokens(s.TotalCacheR), formatTokens(s.TotalCacheW),
 	)
+	if s.OriginalSize > 0 && s.CompressedSize < s.OriginalSize {
+		pct := 100 - 100*s.CompressedSize/s.OriginalSize
+		text += fmt.Sprintf("    [magenta::b]%d%%[-::-] compressed", pct)
+	}
 	a.statsBar.SetText(text)
 }
 
@@ -231,7 +235,7 @@ func (a *App) setModelRow(row int, ms tracker.ModelStats, pct float64) {
 func (a *App) renderRequests() {
 	a.requestTable.Clear()
 
-	headers := []string{"TIME", "MODEL", "INPUT", "OUTPUT", "COST", "LATENCY", "STATUS"}
+	headers := []string{"TIME", "MODEL", "INPUT", "OUTPUT", "COST", "SAVED", "LATENCY", "STATUS"}
 	for i, h := range headers {
 		align := tview.AlignRight
 		if i <= 1 {
@@ -258,6 +262,12 @@ func (a *App) renderRequests() {
 			statusColor = tcell.ColorRed
 		}
 
+		savedText := "-"
+		if req.OriginalSize > 0 && req.CompressedSize < req.OriginalSize {
+			pct := 100 - 100*req.CompressedSize/req.OriginalSize
+			savedText = fmt.Sprintf("%d%%", pct)
+		}
+
 		cells := []struct {
 			text  string
 			color tcell.Color
@@ -268,6 +278,7 @@ func (a *App) renderRequests() {
 			{" " + formatTokens(req.InputTokens) + " ", tcell.ColorWhite, tview.AlignRight},
 			{" " + formatTokens(req.OutputTokens) + " ", tcell.ColorWhite, tview.AlignRight},
 			{" " + formatCost(req.Cost) + " ", costColor(req.Cost), tview.AlignRight},
+			{" " + savedText + " ", tcell.ColorPurple, tview.AlignRight},
 			{" " + formatLatency(req.Latency) + " ", tcell.ColorWhite, tview.AlignRight},
 			{" " + statusText + " ", statusColor, tview.AlignRight},
 		}
@@ -307,7 +318,7 @@ func (a *App) export() {
 	defer f.Close()
 
 	w := csv.NewWriter(f)
-	w.Write([]string{"Time", "Model", "Input Tokens", "Output Tokens", "Cache Read", "Cache Write", "Cost", "Latency (s)", "Status"})
+	w.Write([]string{"Time", "Model", "Input Tokens", "Output Tokens", "Cache Read", "Cache Write", "Cost", "Latency (s)", "Status", "Original Bytes", "Compressed Bytes"})
 	for _, r := range requests {
 		w.Write([]string{
 			r.Timestamp.Format(time.RFC3339),
@@ -319,6 +330,8 @@ func (a *App) export() {
 			fmt.Sprintf("%.6f", r.Cost),
 			fmt.Sprintf("%.3f", r.Latency.Seconds()),
 			strconv.Itoa(r.StatusCode),
+			strconv.Itoa(r.OriginalSize),
+			strconv.Itoa(r.CompressedSize),
 		})
 	}
 	w.Flush()
@@ -390,12 +403,17 @@ func costColor(c float64) tcell.Color {
 
 func shortModel(m string) string {
 	parts := map[string]string{
-		"claude-sonnet-4-20250514":    "claude-sonnet-4",
-		"claude-opus-4-20250514":      "claude-opus-4",
-		"claude-3-7-sonnet-20250219":  "claude-3.7-sonnet",
-		"claude-3-5-sonnet-20241022":  "claude-3.5-sonnet",
-		"claude-3-5-haiku-20241022":   "claude-3.5-haiku",
-		"claude-3-opus-20240229":      "claude-3-opus",
+		"claude-opus-4-6":             "opus-4.6",
+		"claude-sonnet-4-6":           "sonnet-4.6",
+		"claude-haiku-4-5-20251001":   "haiku-4.5",
+		"claude-opus-4-5-20251101":    "opus-4.5",
+		"claude-sonnet-4-5-20250929":  "sonnet-4.5",
+		"claude-opus-4-1-20250805":    "opus-4.1",
+		"claude-sonnet-4-20250514":    "sonnet-4",
+		"claude-opus-4-20250514":      "opus-4",
+		"claude-3-5-sonnet-20241022":  "sonnet-3.5",
+		"claude-3-5-haiku-20241022":   "haiku-3.5",
+		"claude-3-opus-20240229":      "opus-3",
 	}
 	if short, ok := parts[m]; ok {
 		return short

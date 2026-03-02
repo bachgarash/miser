@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"miser/internal/compress"
 	"miser/internal/tracker"
 )
 
@@ -97,13 +98,18 @@ func (s *Server) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var compStats compress.Stats
+	if s.compressionEnabled() {
+		oaiReq.Messages, compStats = s.compressOAIMessages(oaiReq.Messages)
+	}
+
 	antReq := convertRequest(oaiReq)
 	antBody, _ := json.Marshal(antReq)
 
 	upURL := s.Target + "/v1/messages"
 	upReq, err := http.NewRequestWithContext(r.Context(), http.MethodPost, upURL, bytes.NewReader(antBody))
 	if err != nil {
-		s.recordError(oaiReq.Model, start, err)
+		s.recordError(oaiReq.Model, start, err, compStats)
 		http.Error(w, `{"error":{"message":"internal error"}}`, http.StatusInternalServerError)
 		return
 	}
@@ -117,7 +123,7 @@ func (s *Server) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := s.client.Do(upReq)
 	if err != nil {
-		s.recordError(oaiReq.Model, start, err)
+		s.recordError(oaiReq.Model, start, err, compStats)
 		http.Error(w, fmt.Sprintf(`{"error":{"message":"%s"}}`, err.Error()), http.StatusBadGateway)
 		return
 	}
@@ -128,19 +134,19 @@ func (s *Server) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(resp.StatusCode)
 		w.Write(respBody)
-		s.recordError(oaiReq.Model, start, fmt.Errorf("upstream %d", resp.StatusCode))
+		s.recordError(oaiReq.Model, start, fmt.Errorf("upstream %d", resp.StatusCode), compStats)
 		return
 	}
 
 	ct := resp.Header.Get("Content-Type")
 	if oaiReq.Stream && strings.Contains(ct, "text/event-stream") {
-		s.handleOAIStreaming(w, resp, oaiReq.Model, start)
+		s.handleOAIStreaming(w, resp, oaiReq.Model, start, compStats)
 	} else {
-		s.handleOAINonStreaming(w, resp, oaiReq.Model, start)
+		s.handleOAINonStreaming(w, resp, oaiReq.Model, start, compStats)
 	}
 }
 
-func (s *Server) handleOAINonStreaming(w http.ResponseWriter, resp *http.Response, model string, start time.Time) {
+func (s *Server) handleOAINonStreaming(w http.ResponseWriter, resp *http.Response, model string, start time.Time, cs compress.Stats) {
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		s.recordError(model, start, err)
@@ -162,15 +168,17 @@ func (s *Server) handleOAINonStreaming(w http.ResponseWriter, resp *http.Respons
 		antResp.Usage.InputTokens, antResp.Usage.OutputTokens,
 		antResp.Usage.CacheReadInputTokens, antResp.Usage.CacheCreationInputTokens)
 	s.Tracker.Record(tracker.Request{
-		Timestamp:    start,
-		Model:        model,
-		InputTokens:  antResp.Usage.InputTokens,
-		OutputTokens: antResp.Usage.OutputTokens,
-		CacheRead:    antResp.Usage.CacheReadInputTokens,
-		CacheWrite:   antResp.Usage.CacheCreationInputTokens,
-		Cost:         cost,
-		Latency:      time.Since(start),
-		StatusCode:   resp.StatusCode,
+		Timestamp:      start,
+		Model:          model,
+		InputTokens:    antResp.Usage.InputTokens,
+		OutputTokens:   antResp.Usage.OutputTokens,
+		CacheRead:      antResp.Usage.CacheReadInputTokens,
+		CacheWrite:     antResp.Usage.CacheCreationInputTokens,
+		Cost:           cost,
+		Latency:        time.Since(start),
+		StatusCode:     resp.StatusCode,
+		OriginalSize:   cs.OriginalBytes,
+		CompressedSize: cs.CompressedBytes,
 	})
 
 	w.Header().Set("Content-Type", "application/json")
@@ -178,10 +186,10 @@ func (s *Server) handleOAINonStreaming(w http.ResponseWriter, resp *http.Respons
 	json.NewEncoder(w).Encode(oaiResp)
 }
 
-func (s *Server) handleOAIStreaming(w http.ResponseWriter, resp *http.Response, model string, start time.Time) {
+func (s *Server) handleOAIStreaming(w http.ResponseWriter, resp *http.Response, model string, start time.Time, cs compress.Stats) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		s.handleOAINonStreaming(w, resp, model, start)
+		s.handleOAINonStreaming(w, resp, model, start, cs)
 		return
 	}
 
@@ -265,15 +273,17 @@ func (s *Server) handleOAIStreaming(w http.ResponseWriter, resp *http.Response, 
 
 	cost := tracker.CalculateCost(model, inputTokens, outputTokens, cacheRead, cacheWrite)
 	s.Tracker.Record(tracker.Request{
-		Timestamp:    start,
-		Model:        model,
-		InputTokens:  inputTokens,
-		OutputTokens: outputTokens,
-		CacheRead:    cacheRead,
-		CacheWrite:   cacheWrite,
-		Cost:         cost,
-		Latency:      time.Since(start),
-		StatusCode:   resp.StatusCode,
+		Timestamp:      start,
+		Model:          model,
+		InputTokens:    inputTokens,
+		OutputTokens:   outputTokens,
+		CacheRead:      cacheRead,
+		CacheWrite:     cacheWrite,
+		Cost:           cost,
+		Latency:        time.Since(start),
+		StatusCode:     resp.StatusCode,
+		OriginalSize:   cs.OriginalBytes,
+		CompressedSize: cs.CompressedBytes,
 	})
 }
 
@@ -292,6 +302,72 @@ func writeOAIChunk(w http.ResponseWriter, f http.Flusher, id, model string, delt
 	data, _ := json.Marshal(chunk)
 	fmt.Fprintf(w, "data: %s\n\n", data)
 	f.Flush()
+}
+
+// compressOAIMessages extracts text from OpenAI-format messages, runs
+// the compression pipeline, and writes text back. Non-text content
+// blocks (images, tool_use) are preserved. On error the original
+// messages are returned (fail-open).
+func (s *Server) compressOAIMessages(msgs []oaiMessage) ([]oaiMessage, compress.Stats) {
+	var cmsgs []compress.Message
+	type loc struct {
+		msgIdx   int
+		blockIdx int // -1 if content is plain string
+	}
+	var locs []loc
+
+	for i, m := range msgs {
+		switch c := m.Content.(type) {
+		case string:
+			cmsgs = append(cmsgs, compress.Message{Index: i, Role: m.Role, Content: c})
+			locs = append(locs, loc{msgIdx: i, blockIdx: -1})
+		case []interface{}:
+			for bi, block := range c {
+				bm, ok := block.(map[string]interface{})
+				if !ok {
+					continue
+				}
+				if t, _ := bm["type"].(string); t == "text" {
+					if text, _ := bm["text"].(string); text != "" {
+						cmsgs = append(cmsgs, compress.Message{Index: i, Role: m.Role, Content: text})
+						locs = append(locs, loc{msgIdx: i, blockIdx: bi})
+					}
+				}
+			}
+		}
+	}
+
+	if len(cmsgs) == 0 {
+		return msgs, compress.Stats{}
+	}
+
+	compressed, stats := compress.Compress(s.CompressConfig, cmsgs)
+	if stats.OriginalBytes == stats.CompressedBytes {
+		return msgs, stats
+	}
+
+	// Write compressed text back.
+	out := make([]oaiMessage, len(msgs))
+	copy(out, msgs)
+
+	for ci, l := range locs {
+		if l.blockIdx == -1 {
+			out[l.msgIdx].Content = compressed[ci].Content
+		} else {
+			// Content is []interface{} — need to copy-on-write.
+			blocks, ok := out[l.msgIdx].Content.([]interface{})
+			if !ok {
+				continue
+			}
+			bm, ok := blocks[l.blockIdx].(map[string]interface{})
+			if !ok {
+				continue
+			}
+			bm["text"] = compressed[ci].Content
+		}
+	}
+
+	return out, stats
 }
 
 // --- converters ---

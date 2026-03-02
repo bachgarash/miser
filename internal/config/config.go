@@ -10,9 +10,17 @@ import (
 )
 
 type Config struct {
-	Proxy    ProxyConfig            `toml:"proxy"`
-	Models   map[string]ModelConfig `toml:"models"`
-	Fallback *PricingConfig         `toml:"fallback"`
+	Proxy       ProxyConfig            `toml:"proxy"`
+	Models      map[string]ModelConfig `toml:"models"`
+	Fallback    *PricingConfig         `toml:"fallback"`
+	Compression CompressionConfig      `toml:"compression"`
+}
+
+type CompressionConfig struct {
+	Whitespace      bool `toml:"whitespace"`
+	StackTruncation bool `toml:"stack_truncation"`
+	Deduplication   bool `toml:"deduplication"`
+	MinBlockSize    int  `toml:"min_block_size"`
 }
 
 type ProxyConfig struct {
@@ -76,6 +84,9 @@ func Load(path string) (Config, error) {
 	}
 	if cfg.Proxy.Timeout == "" {
 		cfg.Proxy.Timeout = "5m"
+	}
+	if cfg.Compression.MinBlockSize == 0 {
+		cfg.Compression.MinBlockSize = 256
 	}
 
 	return cfg, nil
