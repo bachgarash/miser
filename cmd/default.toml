@@ -10,27 +10,63 @@ timeout = "5m"                              # upstream request timeout
 # ── Model pricing ($ per 1 M tokens) ────────────────────────────────────
 # Add or override any model. Unknown models fall back to [fallback].
 
+# Current generation
+[models.claude-opus-4-6]
+input_per_mtok    = 5.00
+output_per_mtok   = 25.00
+cache_read_per_mtok  = 0.50
+cache_write_per_mtok = 6.25
+
+[models.claude-sonnet-4-6]
+input_per_mtok    = 3.00
+output_per_mtok   = 15.00
+cache_read_per_mtok  = 0.30
+cache_write_per_mtok = 3.75
+
+[models.claude-haiku-4-5-20251001]
+aliases           = ["claude-haiku-4-5"]
+input_per_mtok    = 1.00
+output_per_mtok   = 5.00
+cache_read_per_mtok  = 0.10
+cache_write_per_mtok = 1.25
+
+# Previous generation
+[models.claude-opus-4-5-20251101]
+aliases           = ["claude-opus-4-5"]
+input_per_mtok    = 5.00
+output_per_mtok   = 25.00
+cache_read_per_mtok  = 0.50
+cache_write_per_mtok = 6.25
+
+[models.claude-sonnet-4-5-20250929]
+aliases           = ["claude-sonnet-4-5"]
+input_per_mtok    = 3.00
+output_per_mtok   = 15.00
+cache_read_per_mtok  = 0.30
+cache_write_per_mtok = 3.75
+
+[models.claude-opus-4-1-20250805]
+aliases           = ["claude-opus-4-1"]
+input_per_mtok    = 15.00
+output_per_mtok   = 75.00
+cache_read_per_mtok  = 1.50
+cache_write_per_mtok = 18.75
+
 [models.claude-sonnet-4-20250514]
-aliases           = ["claude-sonnet-4"]
+aliases           = ["claude-sonnet-4", "claude-sonnet-4-0"]
 input_per_mtok    = 3.00
 output_per_mtok   = 15.00
 cache_read_per_mtok  = 0.30
 cache_write_per_mtok = 3.75
 
 [models.claude-opus-4-20250514]
-aliases           = ["claude-opus-4"]
+aliases           = ["claude-opus-4", "claude-opus-4-0"]
 input_per_mtok    = 15.00
 output_per_mtok   = 75.00
 cache_read_per_mtok  = 1.50
 cache_write_per_mtok = 18.75
 
-[models.claude-3-7-sonnet-20250219]
-aliases           = ["claude-3-7-sonnet"]
-input_per_mtok    = 3.00
-output_per_mtok   = 15.00
-cache_read_per_mtok  = 0.30
-cache_write_per_mtok = 3.75
-
+# Legacy
 [models.claude-3-5-sonnet-20241022]
 aliases           = ["claude-3-5-sonnet"]
 input_per_mtok    = 3.00
@@ -51,6 +87,16 @@ input_per_mtok    = 15.00
 output_per_mtok   = 75.00
 cache_read_per_mtok  = 1.50
 cache_write_per_mtok = 18.75
+
+# ── Prompt compression ────────────────────────────────────────────────────
+# Miser can compress prompts before forwarding to reduce input tokens.
+# All layers default to off — enable the ones you want.
+
+[compression]
+whitespace       = false   # trim trailing spaces, collapse blank-line runs
+stack_truncation = false   # deduplicate repeated stack traces
+deduplication    = false   # replace identical messages with a placeholder
+min_block_size   = 256     # minimum message size (bytes) for deduplication
 
 # ── Fallback pricing for unrecognised models ─────────────────────────────
 

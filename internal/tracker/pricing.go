@@ -21,17 +21,32 @@ var pricingStore = struct {
 	fallback Pricing
 }{
 	models: map[string]Pricing{
-		"claude-sonnet-4-20250514": {3.00, 15.00, 0.30, 3.75},
-		"claude-opus-4-20250514":   {15.00, 75.00, 1.50, 18.75},
-		"claude-3-7-sonnet-20250219": {3.00, 15.00, 0.30, 3.75},
+		// Current generation
+		"claude-opus-4-6":          {5.00, 25.00, 0.50, 6.25},
+		"claude-sonnet-4-6":        {3.00, 15.00, 0.30, 3.75},
+		"claude-haiku-4-5-20251001": {1.00, 5.00, 0.10, 1.25},
+
+		// Previous generation
+		"claude-opus-4-5-20251101":   {5.00, 25.00, 0.50, 6.25},
+		"claude-sonnet-4-5-20250929": {3.00, 15.00, 0.30, 3.75},
+		"claude-opus-4-1-20250805":   {15.00, 75.00, 1.50, 18.75},
+		"claude-sonnet-4-20250514":   {3.00, 15.00, 0.30, 3.75},
+		"claude-opus-4-20250514":     {15.00, 75.00, 1.50, 18.75},
+
+		// Legacy
 		"claude-3-5-sonnet-20241022": {3.00, 15.00, 0.30, 3.75},
 		"claude-3-5-haiku-20241022":  {0.80, 4.00, 0.08, 1.00},
 		"claude-3-opus-20240229":     {15.00, 75.00, 1.50, 18.75},
 	},
 	aliases: map[string]string{
+		"claude-haiku-4-5":  "claude-haiku-4-5-20251001",
+		"claude-opus-4-5":   "claude-opus-4-5-20251101",
+		"claude-sonnet-4-5": "claude-sonnet-4-5-20250929",
+		"claude-opus-4-1":   "claude-opus-4-1-20250805",
+		"claude-sonnet-4-0": "claude-sonnet-4-20250514",
+		"claude-opus-4-0":   "claude-opus-4-20250514",
 		"claude-sonnet-4":   "claude-sonnet-4-20250514",
 		"claude-opus-4":     "claude-opus-4-20250514",
-		"claude-3-7-sonnet": "claude-3-7-sonnet-20250219",
 		"claude-3-5-sonnet": "claude-3-5-sonnet-20241022",
 		"claude-3-5-haiku":  "claude-3-5-haiku-20241022",
 		"claude-3-opus":     "claude-3-opus-20240229",

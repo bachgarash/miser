@@ -7,36 +7,42 @@ import (
 )
 
 type Request struct {
-	ID           int
-	Timestamp    time.Time
-	Model        string
-	InputTokens  int
-	OutputTokens int
-	CacheRead    int
-	CacheWrite   int
-	Cost         float64
-	Latency      time.Duration
-	StatusCode   int
-	Error        string
+	ID             int
+	Timestamp      time.Time
+	Model          string
+	InputTokens    int
+	OutputTokens   int
+	CacheRead      int
+	CacheWrite     int
+	Cost           float64
+	Latency        time.Duration
+	StatusCode     int
+	Error          string
+	OriginalSize   int // prompt bytes before compression
+	CompressedSize int // prompt bytes after compression
 }
 
 type ModelStats struct {
-	Model        string
-	Requests     int
-	InputTokens  int
-	OutputTokens int
-	CacheRead    int
-	CacheWrite   int
-	TotalCost    float64
+	Model          string
+	Requests       int
+	InputTokens    int
+	OutputTokens   int
+	CacheRead      int
+	CacheWrite     int
+	TotalCost      float64
+	OriginalSize   int
+	CompressedSize int
 }
 
 type Summary struct {
-	TotalCost     float64
-	TotalRequests int
-	TotalInput    int
-	TotalOutput   int
-	TotalCacheR   int
-	TotalCacheW   int
+	TotalCost      float64
+	TotalRequests  int
+	TotalInput     int
+	TotalOutput    int
+	TotalCacheR    int
+	TotalCacheW    int
+	OriginalSize   int
+	CompressedSize int
 }
 
 type Tracker struct {
@@ -107,6 +113,8 @@ func (t *Tracker) GetModelStats() []ModelStats {
 		s.CacheRead += r.CacheRead
 		s.CacheWrite += r.CacheWrite
 		s.TotalCost += r.Cost
+		s.OriginalSize += r.OriginalSize
+		s.CompressedSize += r.CompressedSize
 	}
 
 	stats := make([]ModelStats, 0, len(byModel))
@@ -131,6 +139,8 @@ func (t *Tracker) GetSummary() Summary {
 		s.TotalOutput += r.OutputTokens
 		s.TotalCacheR += r.CacheRead
 		s.TotalCacheW += r.CacheWrite
+		s.OriginalSize += r.OriginalSize
+		s.CompressedSize += r.CompressedSize
 	}
 	return s
 }
